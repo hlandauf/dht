@@ -11,18 +11,18 @@ package dht
 type arena chan []byte
 
 func newArena(blockSize int, numBlocks int) arena {
-	blocks := make(arena, numBlocks)
-	for i := 0; i < numBlocks; i++ {
-		blocks <- make([]byte, blockSize)
-	}
-	return blocks
+  blocks := make(arena, numBlocks)
+  for i := 0; i < numBlocks; i++ {
+    blocks <- make([]byte, blockSize)
+  }
+  return blocks
 }
 
 func (a arena) Pop() (x []byte) {
-	return <-a
+  return <-a
 }
 
 func (a arena) Push(x []byte) {
-	x = x[:cap(x)]
-	a <- x
+  x = x[:cap(x)]
+  a <- x
 }

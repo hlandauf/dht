@@ -1,145 +1,145 @@
 package dht
 
 import (
-	"expvar"
-	"fmt"
-	"net"
-	"time"
+  "expvar"
+  "fmt"
+  "net"
+  "time"
 
-	log "github.com/golang/glog"
+  log "github.com/golang/glog"
 )
 
 func newRoutingTable() *routingTable {
-	return &routingTable{
-		&nTree{},
-		make(map[string]*remoteNode),
-		"",
-		nil,
-		0,
-	}
+  return &routingTable{
+    &nTree{},
+    make(map[string]*remoteNode),
+    "",
+    nil,
+    0,
+  }
 }
 
 type routingTable struct {
-	*nTree
-	// addresses is a map of UDP addresses in host:port format and
-	// remoteNodes. A string is used because it's not possible to create
-	// a map using net.UDPAddr
-	// as a key.
-	addresses map[string]*remoteNode
+  *nTree
+  // addresses is a map of UDP addresses in host:port format and
+  // remoteNodes. A string is used because it's not possible to create
+  // a map using net.UDPAddr
+  // as a key.
+  addresses map[string]*remoteNode
 
-	// Neighborhood.
-	nodeId       string // This shouldn't be here. Move neighborhood upkeep one level up?
-	boundaryNode *remoteNode
-	// How many prefix bits are shared between boundaryNode and nodeId.
-	proximity int
+  // Neighborhood.
+  nodeId       string // This shouldn't be here. Move neighborhood upkeep one level up?
+  boundaryNode *remoteNode
+  // How many prefix bits are shared between boundaryNode and nodeId.
+  proximity int
 }
 
 // hostPortToNode finds or creates a node based on the specified hostPort
 // specification, which should be a UDP address in the form "host:port".
 // Specifying an illegal string is illegal and will generate a panic.
 func (r *routingTable) hostPortToNode(hostPort string) (node *remoteNode, addr string, existed bool, err error) {
-	if hostPort == "" {
-		panic("programming error: hostPortToNode received a nil hostPort")
-	}
-	address, err := net.ResolveUDPAddr("udp", hostPort)
-	if err != nil {
-		return nil, "", false, err
-	}
-	if address.String() == "" {
-		panic("programming error: address resolution for hostPortToNode returned an empty string")
-	}
-	n, existed := r.addresses[address.String()]
-	return n, address.String(), existed, nil
+  if hostPort == "" {
+    panic("programming error: hostPortToNode received a nil hostPort")
+  }
+  address, err := net.ResolveUDPAddr("udp", hostPort)
+  if err != nil {
+    return nil, "", false, err
+  }
+  if address.String() == "" {
+    panic("programming error: address resolution for hostPortToNode returned an empty string")
+  }
+  n, existed := r.addresses[address.String()]
+  return n, address.String(), existed, nil
 }
 
 func (r *routingTable) length() int {
-	return len(r.addresses)
+  return len(r.addresses)
 }
 
 func (r *routingTable) reachableNodes() (tbl map[string][]byte) {
-	tbl = make(map[string][]byte)
-	for addr, r := range r.addresses {
-		if addr == "" {
-			log.V(3).Infof("reachableNodes: found empty address for node %x.", r.id)
-			continue
-		}
-		if r.reachable && len(r.id) == 20 {
-			tbl[addr] = []byte(r.id)
-		}
-	}
+  tbl = make(map[string][]byte)
+  for addr, r := range r.addresses {
+    if addr == "" {
+      log.V(3).Infof("reachableNodes: found empty address for node %x.", r.id)
+      continue
+    }
+    if r.reachable && len(r.id) == 20 {
+      tbl[addr] = []byte(r.id)
+    }
+  }
 
-	hexId := fmt.Sprintf("%x", r.nodeId)
-	// This creates a new expvar everytime, but the alternative is too
-	// bothersome (get the current value, type cast it, ensure it
-	// exists..). Also I'm not using NewInt because I don't want to publish
-	// the value.
-	v := new(expvar.Int)
-	v.Set(int64(len(tbl)))
-	reachableNodes.Set(hexId, v)
-	return
+  hexId := fmt.Sprintf("%x", r.nodeId)
+  // This creates a new expvar everytime, but the alternative is too
+  // bothersome (get the current value, type cast it, ensure it
+  // exists..). Also I'm not using NewInt because I don't want to publish
+  // the value.
+  v := new(expvar.Int)
+  v.Set(int64(len(tbl)))
+  reachableNodes.Set(hexId, v)
+  return
 
 }
 
 func (r *routingTable) numNodes() int {
-	return len(r.addresses)
+  return len(r.addresses)
 }
 
 func isValidAddr(addr string) bool {
-	if addr == "" {
-		return false
-	}
-	if h, p, err := net.SplitHostPort(addr); h == "" || p == "" || err != nil {
-		return false
-	}
-	return true
+  if addr == "" {
+    return false
+  }
+  if h, p, err := net.SplitHostPort(addr); h == "" || p == "" || err != nil {
+    return false
+  }
+  return true
 }
 
 // update the existing routingTable entry for this node by setting its correct
 // infohash id. Gives an error if the node was not found.
 func (r *routingTable) update(node *remoteNode) error {
-	_, addr, existed, err := r.hostPortToNode(node.address.String())
-	if err != nil {
-		return err
-	}
-	if !isValidAddr(addr) {
-		return fmt.Errorf("routingTable.update received an invalid address %v", addr)
-	}
-	if !existed {
-		return fmt.Errorf("node missing from the routing table:", node.address.String())
-	}
-	if node.id != "" {
-		r.nTree.insert(node)
-		totalNodes.Add(1)
-		r.addresses[addr].id = node.id
-	}
-	return nil
+  _, addr, existed, err := r.hostPortToNode(node.address.String())
+  if err != nil {
+    return err
+  }
+  if !isValidAddr(addr) {
+    return fmt.Errorf("routingTable.update received an invalid address %v", addr)
+  }
+  if !existed {
+    return fmt.Errorf("node missing from the routing table:", node.address.String())
+  }
+  if node.id != "" {
+    r.nTree.insert(node)
+    totalNodes.Add(1)
+    r.addresses[addr].id = node.id
+  }
+  return nil
 }
 
 // insert the provided node into the routing table. Gives an error if another
 // node already existed with that address.
 func (r *routingTable) insert(node *remoteNode) error {
-	if node.address.Port == 0 || node.address.IP.IsUnspecified() {
-		panic("routingTable.insert() got a node with a nil address")
-	}
-	_, addr, existed, err := r.hostPortToNode(node.address.String())
-	if err != nil {
-		return err
-	}
-	if !isValidAddr(addr) {
-		return fmt.Errorf("routingTable.insert received an invalid address %v", addr)
+  if node.address.Port == 0 || node.address.IP.IsUnspecified() {
+    panic("routingTable.insert() got a node with a nil address")
+  }
+  _, addr, existed, err := r.hostPortToNode(node.address.String())
+  if err != nil {
+    return err
+  }
+  if !isValidAddr(addr) {
+    return fmt.Errorf("routingTable.insert received an invalid address %v", addr)
 
-	}
-	if existed {
-		return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
-	}
-	r.addresses[addr] = node
-	// We don't know the ID of all nodes.
-	if !bogusId(node.id) {
-		// recursive version of node insertion.
-		r.nTree.insert(node)
-		totalNodes.Add(1)
-	}
-	return nil
+  }
+  if existed {
+    return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
+  }
+  r.addresses[addr] = node
+  // We don't know the ID of all nodes.
+  if !bogusId(node.id) {
+    // recursive version of node insertion.
+    r.nTree.insert(node)
+    totalNodes.Add(1)
+  }
+  return nil
 }
 
 // getOrCreateNode returns a node for hostPort, which can be an IP:port or
@@ -147,128 +147,128 @@ func (r *routingTable) insert(node *remoteNode) error {
 // that is already in the routing table, but create a new one otherwise, thus
 // being idempotent.
 func (r *routingTable) getOrCreateNode(id string, hostPort string) (node *remoteNode, err error) {
-	node, addr, existed, err := r.hostPortToNode(hostPort)
-	if err != nil {
-		return nil, err
-	}
-	if existed {
-		return node, nil
-	}
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return nil, err
-	}
-	node = newRemoteNode(*udpAddr, id)
-	return node, r.insert(node)
+  node, addr, existed, err := r.hostPortToNode(hostPort)
+  if err != nil {
+    return nil, err
+  }
+  if existed {
+    return node, nil
+  }
+  udpAddr, err := net.ResolveUDPAddr("udp", addr)
+  if err != nil {
+    return nil, err
+  }
+  node = newRemoteNode(*udpAddr, id)
+  return node, r.insert(node)
 }
 
 func (r *routingTable) kill(n *remoteNode) {
-	delete(r.addresses, n.address.String())
-	r.nTree.cut(InfoHash(n.id), 0)
-	totalKilledNodes.Add(1)
+  delete(r.addresses, n.address.String())
+  r.nTree.cut(InfoHash(n.id), 0)
+  totalKilledNodes.Add(1)
 
-	if n.id == r.boundaryNode.id {
-		r.resetNeighborhoodBoundary()
-	}
+  if n.id == r.boundaryNode.id {
+    r.resetNeighborhoodBoundary()
+  }
 }
 
 func (r *routingTable) resetNeighborhoodBoundary() {
-	r.proximity = 0
-	// Try to find a distant one within the neighborhood and promote it as
-	// the most distant node in the neighborhood.
-	neighbors := r.lookup(InfoHash(r.nodeId))
-	if len(neighbors) > 0 {
-		r.boundaryNode = neighbors[len(neighbors)-1]
-		r.proximity = commonBits(r.nodeId, r.boundaryNode.id)
-	}
+  r.proximity = 0
+  // Try to find a distant one within the neighborhood and promote it as
+  // the most distant node in the neighborhood.
+  neighbors := r.lookup(InfoHash(r.nodeId))
+  if len(neighbors) > 0 {
+    r.boundaryNode = neighbors[len(neighbors)-1]
+    r.proximity = commonBits(r.nodeId, r.boundaryNode.id)
+  }
 
 }
 
 func (r *routingTable) cleanup(cleanupPeriod time.Duration) (needPing []*remoteNode) {
-	needPing = make([]*remoteNode, 0, 10)
-	t0 := time.Now()
-	// Needs some serious optimization.
-	for addr, n := range r.addresses {
-		if addr != n.address.String() {
-			log.V(3).Infof("cleanup: node address mismatches: %v != %v. Deleting node", addr, n.address.String())
-			r.kill(n)
-			continue
-		}
-		if addr == "" {
-			log.V(3).Infof("cleanup: found empty address for node %x. Deleting node", n.id)
-			r.kill(n)
-			continue
-		}
-		if n.reachable {
-			if len(n.pendingQueries) == 0 {
-				goto PING
-			}
-			// Tolerate 2 cleanup cycles.
-			if time.Since(n.lastResponseTime) > cleanupPeriod*2+(time.Minute) {
-				log.V(4).Infof("DHT: Old node seen %v ago. Deleting", time.Since(n.lastResponseTime))
-				r.kill(n)
-				continue
-			}
-			if time.Since(n.lastResponseTime).Nanoseconds() < cleanupPeriod.Nanoseconds()/2 {
-				// Seen recently. Don't need to ping.
-				continue
-			}
+  needPing = make([]*remoteNode, 0, 10)
+  t0 := time.Now()
+  // Needs some serious optimization.
+  for addr, n := range r.addresses {
+    if addr != n.address.String() {
+      log.V(3).Infof("cleanup: node address mismatches: %v != %v. Deleting node", addr, n.address.String())
+      r.kill(n)
+      continue
+    }
+    if addr == "" {
+      log.V(3).Infof("cleanup: found empty address for node %x. Deleting node", n.id)
+      r.kill(n)
+      continue
+    }
+    if n.reachable {
+      if len(n.pendingQueries) == 0 {
+        goto PING
+      }
+      // Tolerate 2 cleanup cycles.
+      if time.Since(n.lastResponseTime) > cleanupPeriod*2+(time.Minute) {
+        log.V(4).Infof("DHT: Old node seen %v ago. Deleting", time.Since(n.lastResponseTime))
+        r.kill(n)
+        continue
+      }
+      if time.Since(n.lastResponseTime).Nanoseconds() < cleanupPeriod.Nanoseconds()/2 {
+        // Seen recently. Don't need to ping.
+        continue
+      }
 
-		} else {
-			// Not reachable.
-			if len(n.pendingQueries) > 2 {
-				// Didn't reply to 2 consecutive queries.
-				log.V(4).Infof("DHT: Node never replied to ping. Deleting. %v", n.address)
-				r.kill(n)
-				continue
-			}
-		}
-	PING:
-		needPing = append(needPing, n)
-	}
-	duration := time.Since(t0)
-	// If this pauses the server for too long I may have to segment the cleanup.
-	// 2000 nodes: it takes ~12ms
-	// 4000 nodes: ~24ms.
-	log.V(3).Info("DHT: Routing table cleanup took %v", duration)
-	return needPing
+    } else {
+      // Not reachable.
+      if len(n.pendingQueries) > 2 {
+        // Didn't reply to 2 consecutive queries.
+        log.V(4).Infof("DHT: Node never replied to ping. Deleting. %v", n.address)
+        r.kill(n)
+        continue
+      }
+    }
+  PING:
+    needPing = append(needPing, n)
+  }
+  duration := time.Since(t0)
+  // If this pauses the server for too long I may have to segment the cleanup.
+  // 2000 nodes: it takes ~12ms
+  // 4000 nodes: ~24ms.
+  log.V(3).Info("DHT: Routing table cleanup took %v", duration)
+  return needPing
 }
 
 // neighborhoodUpkeep will update the routingtable if the node n is closer than
 // the 8 nodes in our neighborhood, by replacing the least close one
 // (boundary). n.id is assumed to have length 20.
 func (r *routingTable) neighborhoodUpkeep(n *remoteNode) {
-	if r.boundaryNode == nil {
-		r.addNewNeighbor(n, false)
-		return
-	}
-	if r.length() < kNodes {
-		r.addNewNeighbor(n, false)
-		return
-	}
-	cmp := commonBits(r.nodeId, n.id)
-	if cmp == 0 {
-		// Not significantly better.
-		return
-	}
-	if cmp > r.proximity {
-		r.addNewNeighbor(n, true)
-		return
-	}
+  if r.boundaryNode == nil {
+    r.addNewNeighbor(n, false)
+    return
+  }
+  if r.length() < kNodes {
+    r.addNewNeighbor(n, false)
+    return
+  }
+  cmp := commonBits(r.nodeId, n.id)
+  if cmp == 0 {
+    // Not significantly better.
+    return
+  }
+  if cmp > r.proximity {
+    r.addNewNeighbor(n, true)
+    return
+  }
 }
 
 func (r *routingTable) addNewNeighbor(n *remoteNode, displaceBoundary bool) {
-	if err := r.insert(n); err != nil {
-		log.V(3).Infof("addNewNeighbor error: %v", err)
-		return
-	}
-	if displaceBoundary && r.boundaryNode != nil {
-		// This will also take care of setting a new boundary.
-		r.kill(r.boundaryNode)
-	} else {
-		r.resetNeighborhoodBoundary()
-	}
-	log.V(4).Infof("New neighbor added to neighborhood with proximity %d", r.proximity)
+  if err := r.insert(n); err != nil {
+    log.V(3).Infof("addNewNeighbor error: %v", err)
+    return
+  }
+  if displaceBoundary && r.boundaryNode != nil {
+    // This will also take care of setting a new boundary.
+    r.kill(r.boundaryNode)
+  } else {
+    r.resetNeighborhoodBoundary()
+  }
+  log.V(4).Infof("New neighbor added to neighborhood with proximity %d", r.proximity)
 }
 
 // pingSlowly pings the remote nodes in needPing, distributing the pings
@@ -276,31 +276,31 @@ func (r *routingTable) addNewNeighbor(n *remoteNode, displaceBoundary bool) {
 // doesn't really send the pings, but signals to the main goroutine that it
 // should ping the nodes, using the pingRequest channel.
 func pingSlowly(pingRequest chan *remoteNode, needPing []*remoteNode, cleanupPeriod time.Duration, stop chan bool) {
-	if len(needPing) == 0 {
-		return
-	}
-	duration := cleanupPeriod - (1 * time.Minute)
-	perPingWait := duration / time.Duration(len(needPing))
-	for _, r := range needPing {
-		pingRequest <- r
-		select {
-		case <-time.After(perPingWait):
-		case <-stop:
-			return
-		}
-	}
+  if len(needPing) == 0 {
+    return
+  }
+  duration := cleanupPeriod - (1 * time.Minute)
+  perPingWait := duration / time.Duration(len(needPing))
+  for _, r := range needPing {
+    pingRequest <- r
+    select {
+    case <-time.After(perPingWait):
+    case <-stop:
+      return
+    }
+  }
 }
 
 var (
-	// totalKilledNodes is a monotonically increasing counter of times nodes were killed from
-	// the routing table. If a node is later added to the routing table and killed again, it is
-	// counted twice.
-	totalKilledNodes = expvar.NewInt("totalKilledNodes")
-	// totalNodes is a monotonically increasing counter of times nodes were added to the routing
-	// table. If a node is removed then later added again, it is counted twice.
-	totalNodes = expvar.NewInt("totalNodes")
-	// reachableNodes is the count of all reachable nodes from a particular DHT node. The map
-	// key is the local node's infohash. The value is a gauge with the count of reachable nodes
-	// at the latest time the routing table was persisted on disk.
-	reachableNodes = expvar.NewMap("reachableNodes")
+  // totalKilledNodes is a monotonically increasing counter of times nodes were killed from
+  // the routing table. If a node is later added to the routing table and killed again, it is
+  // counted twice.
+  totalKilledNodes = expvar.NewInt("totalKilledNodes")
+  // totalNodes is a monotonically increasing counter of times nodes were added to the routing
+  // table. If a node is removed then later added again, it is counted twice.
+  totalNodes = expvar.NewInt("totalNodes")
+  // reachableNodes is the count of all reachable nodes from a particular DHT node. The map
+  // key is the local node's infohash. The value is a gauge with the count of reachable nodes
+  // at the latest time the routing table was persisted on disk.
+  reachableNodes = expvar.NewMap("reachableNodes")
 )
