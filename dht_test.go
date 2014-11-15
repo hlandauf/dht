@@ -50,7 +50,7 @@ M:
     case <-tick:
       // Repeat the request until a result appears, querying nodes that haven't been
       // consulted before and finding close-by candidates for the infohash.
-      d.PeersRequest(string(infoHash), false)
+      d.PeersRequest(infoHash, false)
     case infoHashPeers = <-d.PeersRequestResults:
       break M
     case <-time.After(30 * time.Second):
@@ -76,12 +76,12 @@ M:
   // Peer found for the requested infohash or the test was skipped
 }
 
-func startNode(routers string, ih string) (*DHT, error) {
+func startNode(routers string, ih InfoHash) (*DHT, error) {
   c := NewConfig()
   //c.SaveRoutingTable = false
-  c.DHTRouters = strings.Split(routers, ",")
-  if len(c.DHTRouters) == 1 && c.DHTRouters[0] == "" {
-    c.DHTRouters = []string{}
+	dhtRouters := strings.Split(routers, ",")
+  if len(dhtRouters) == 1 && dhtRouters[0] == "" {
+    dhtRouters = []string{}
   }
   c.Port = 0 //6060 //0
   node, err := New(c)
@@ -91,12 +91,15 @@ func startNode(routers string, ih string) (*DHT, error) {
   // Remove the buffer
   node.peersRequest = make(chan ihReq, 0)
   go node.Run()
+	for _, v := range dhtRouters {
+		node.AddNode(v, "")
+	}
   node.PeersRequest(ih, true)
   return node, nil
 }
 
 // drainResults loops until the target number of peers are found, or a time limit is reached.
-func drainResults(n *DHT, ih string, targetCount int, timeout time.Duration) error {
+func drainResults(n *DHT, ih InfoHash, targetCount int, timeout time.Duration) error {
   count := 0
   after := time.After(timeout)
   tick := time.NewTicker(time.Second/5)
@@ -133,7 +136,7 @@ func TestDHTLocal(t *testing.T) {
   if err != nil {
     t.Fatalf(err.Error())
   }
-  n1, err := startNode("", string(infoHash))
+  n1, err := startNode("", infoHash)
   if err != nil {
     t.Errorf("n1 startNode: %v", err)
     return
@@ -141,13 +144,13 @@ func TestDHTLocal(t *testing.T) {
   fmt.Println("A02")
 
   router := fmt.Sprintf("localhost:%d", n1.Port())
-  n2, err := startNode(router, string(infoHash))
+  n2, err := startNode(router, infoHash)
   if err != nil {
     t.Errorf("n2 startNode: %v", err)
     return
   }
   fmt.Println("A03")
-  n3, err := startNode(router, string(infoHash))
+  n3, err := startNode(router, infoHash)
   if err != nil {
     t.Errorf("n3 startNode: %v", err)
     return
@@ -156,13 +159,13 @@ func TestDHTLocal(t *testing.T) {
   wg := new(sync.WaitGroup)
   wg.Add(2)
   go func() {
-    if err := drainResults(n2, string(infoHash), 1, 10*time.Second); err != nil {
+    if err := drainResults(n2, infoHash, 1, 10*time.Second); err != nil {
       t.Errorf("drainResult n2: %v", err)
     }
     wg.Done()
   }()
   go func() {
-    if err := drainResults(n3, string(infoHash), 1, 10*time.Second); err != nil {
+    if err := drainResults(n3, infoHash, 1, 10*time.Second); err != nil {
       t.Errorf("drainResult n3: %v", err)
     }
     wg.Done()
@@ -201,11 +204,11 @@ func TestDHTLarge(t *testing.T) {
       t.Error(err)
       continue
     }
-    node.AddNode(ip[0] + ":6881")
+    node.AddNode(ip[0] + ":6881", "")
   }
 
-  node.AddNode("117.78.1.52:6891")
-  node.AddNode("88.183.138.12:52804")
+  node.AddNode("117.78.1.52:6891", "")
+  node.AddNode("88.183.138.12:52804", "")
 
   // Test that we can reach at least one node.
   success := false
@@ -237,7 +240,7 @@ func TestDHTLarge(t *testing.T) {
   //infoHash := InfoHash("\xb4\x62\xc0\xa8\xbc\xef\x1c\xe5\xbb\x56\xb9\xfd\xb8\xcf\x37\xff\xd0\x2f\x5f\x59")
   infoHash := InfoHash("\xc0\x66\x42\x34\xb4\x4f\x25\xde\x6c\xc7\xb5\x36\xa7\x98\xc6\x5f\x85\x80\x79\xcb")
   //c0 66 42 34 b4 4f 25 de 6c c7 b5 36 a7 98 c6 5f 85 80 79 cb
-  go node.PeersRequest(string(infoHash), true)
+  go node.PeersRequest(infoHash, true)
   timeout := make(chan bool, 1)
   go func() {
     time.Sleep(30 * time.Second)
@@ -279,16 +282,16 @@ func TestNewDHTConfig(t *testing.T) {
 
 func TestRegisterFlags(t *testing.T) {
   c := &Config{
-    DHTRouters:    []string{"example.router.com:6060"},
+    //DHTRouters:    []string{"example.router.com:6060"},
     MaxNodes:      2020,
     CleanupPeriod: time.Second,
     //SavePeriod:    time.Second * 2,
     RateLimit:     999,
   }
   RegisterFlags(c)
-  if flag.Lookup("routers").DefValue != c.DHTRoutersToString() {
-    t.Fatal("Incorrect routers flag")
-  }
+  //if flag.Lookup("routers").DefValue != c.DHTRoutersToString() {
+  //  t.Fatal("Incorrect routers flag")
+  //}
   if flag.Lookup("maxNodes").DefValue != strconv.FormatInt(int64(c.MaxNodes), 10) {
     t.Fatal("Incorrect maxNodes flag")
   }

@@ -82,32 +82,6 @@ type Config struct {
   NodeID string
 }
 
-/*func (self *Config) dhtRoutersToString() string {
-  s := ""
-  first := true
-  for _, x := range self.DHTRouters {
-    if !first {
-      s += ","
-    }
-    s += x
-    first = false
-  }
-  return s
-}*/
-
-/*type routerListSetter struct {
-  c *Config
-}*/
-
-/*func (self *routerListSetter) String() string {
-  return self.c.DHTRoutersToString()
-}
-
-func (self *routerListSetter) Set(rls string) error {
-  self.c.DHTRouters = strings.Split(rls, ",")
-  return nil
-}*/
-
 // Creates a *Config populated with default values.
 func NewConfig() *Config {
   return &Config{
@@ -120,7 +94,6 @@ func NewConfig() *Config {
       "router.bittorrent.com:6881",
       "dht.transmissionbt.com:6881",
     },*/
-    //DHTRouters:       "de.magnets.im:6881,cz.magnets.im:6881,router.bittorrent.com:6881,dht.transmissionbt.com:6881",
 
     MaxNodes:         500,
     CleanupPeriod:    15 * time.Minute,
@@ -1030,22 +1003,22 @@ func randNodeId() []byte {
 }
 
 var (
-  totalNodesReached            = expvar.NewInt("totalNodesReached")
-  totalGetPeersDupes           = expvar.NewInt("totalGetPeersDupes")
-  totalFindNodeDupes           = expvar.NewInt("totalFindNodeDupes")
-  totalSelfPromotions          = expvar.NewInt("totalSelfPromotions")
-  totalPeers                   = expvar.NewInt("totalPeers")
-  totalSentPing                = expvar.NewInt("totalSentPing")
-  totalSentGetPeers            = expvar.NewInt("totalSentGetPeers")
-  totalSentFindNode            = expvar.NewInt("totalSentFindNode")
-  totalRecvGetPeers            = expvar.NewInt("totalRecvGetPeers")
-  totalRecvGetPeersReply       = expvar.NewInt("totalRecvGetPeersReply")
-  totalRecvPingReply           = expvar.NewInt("totalRecvPingReply")
-  totalRecvFindNode            = expvar.NewInt("totalRecvFindNode")
-  totalRecvFindNodeReply       = expvar.NewInt("totalRecvFindNodeReply")
-  totalPacketsFromBlockedHosts = expvar.NewInt("totalPacketsFromBlockedHosts")
-  totalDroppedPackets          = expvar.NewInt("totalDroppedPackets")
-  totalRecv                    = expvar.NewInt("totalRecv")
-  totalUnreachable             = expvar.NewInt("totalUnreachable")
-  totalUnreachableAlreadyDead  = expvar.NewInt("totalUnreachableAlreadyDead")
+  totalNodesReached            = expvar.NewInt("dht.totalNodesReached")
+  totalGetPeersDupes           = expvar.NewInt("dht.totalGetPeersDupes")
+  totalFindNodeDupes           = expvar.NewInt("dht.totalFindNodeDupes")
+  totalSelfPromotions          = expvar.NewInt("dht.totalSelfPromotions")
+  totalPeers                   = expvar.NewInt("dht.totalPeers")
+  totalSentPing                = expvar.NewInt("dht.totalSentPing")
+  totalSentGetPeers            = expvar.NewInt("dht.totalSentGetPeers")
+  totalSentFindNode            = expvar.NewInt("dht.totalSentFindNode")
+  totalRecvGetPeers            = expvar.NewInt("dht.totalRecvGetPeers")
+  totalRecvGetPeersReply       = expvar.NewInt("dht.totalRecvGetPeersReply")
+  totalRecvPingReply           = expvar.NewInt("dht.totalRecvPingReply")
+  totalRecvFindNode            = expvar.NewInt("dht.totalRecvFindNode")
+  totalRecvFindNodeReply       = expvar.NewInt("dht.totalRecvFindNodeReply")
+  totalPacketsFromBlockedHosts = expvar.NewInt("dht.totalPacketsFromBlockedHosts")
+  totalDroppedPackets          = expvar.NewInt("dht.totalDroppedPackets")
+  totalRecv                    = expvar.NewInt("dht.totalRecv")
+  totalUnreachable             = expvar.NewInt("dht.totalUnreachable")
+  totalUnreachableAlreadyDead  = expvar.NewInt("dht.totalUnreachableAlreadyDead")
 )

@@ -1,7 +1,7 @@
 package dhtutil
 import "database/sql"
 import _ "github.com/mattn/go-sqlite3"
-import "dht"
+import "github.com/hlandau/dht"
 import "time"
 import "encoding/hex"
 import "crypto/rand"
